@@ -1,0 +1,27 @@
+{
+  "namespace": "com.example.avro",
+  "type": "record",
+  "name": "Order",
+  "fields": [
+    { "name": "orderId", "type": "string" },
+    { "name": "customerId", "type": "string" },
+    { "name": "orderDate", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "items", "type": {
+      "type": "array",
+      "items": {
+        "type": "record",
+        "name": "Item",
+        "fields": [
+          { "name": "itemId", "type": "string" },
+          { "name": "quantity", "type": "int" },
+          { "name": "price", "type": "double" }
+        ]
+      }
+    }
+    },
+    { "name": "totalAmount", "type": "double" },
+    { "name": "currency", "type": "string" },
+    { "name": "status", "type": "string" },
+    { "name": "shippingCost", "type": [ "null", "double" ], "default": null }
+  ]
+}
