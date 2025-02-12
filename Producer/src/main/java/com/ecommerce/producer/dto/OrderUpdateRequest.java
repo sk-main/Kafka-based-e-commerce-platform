@@ -10,7 +10,7 @@ public class OrderUpdateRequest {
     @NotBlank(message = "status must not be blank")
     private String status;
 
-    // Getters and Setters
+    // Getters and setters
     public String getOrderId() {
         return orderId;
     }
@@ -24,4 +24,5 @@ public class OrderUpdateRequest {
         this.status = status;
     }
 }
+
 

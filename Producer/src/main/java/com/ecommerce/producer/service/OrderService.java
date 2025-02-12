@@ -2,59 +2,100 @@ package com.ecommerce.producer.service;
 
 import com.ecommerce.producer.dto.OrderRequest;
 import com.ecommerce.producer.dto.OrderUpdateRequest;
-import com.ecommerce.producer.model.Item;
-import com.ecommerce.producer.model.Order;
-import com.ecommerce.producer.repository.OrderRepository;
+import com.example.avro.Item;
+import com.example.avro.Order;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 @Service
 public class OrderService {
 
-    private final Random random = new Random();
-    private final OrderRepository orderRepository;
+    private final KafkaTemplate<String, Order> kafkaTemplate;
+    // In-memory store for orders (for demonstration purposes)
+    private final ConcurrentMap<String, Order> orderStore = new ConcurrentHashMap<>();
 
-    public OrderService(OrderRepository orderRepository) {
-        this.orderRepository = orderRepository;
+    public OrderService(KafkaTemplate<String, Order> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
     }
 
-    // Existing method to create an order (for example, via /create-order)
     public Order createOrder(OrderRequest request) {
         Order order = new Order();
         order.setOrderId(request.getOrderId());
-        order.setCustomerId("CUST-" + (10000 + random.nextInt(90000)));
+        order.setCustomerId("CUST-" + (10000 + new Random().nextInt(90000)));
+        // Set order date as an Instant
         order.setOrderDate(Instant.now());
 
-        // Generate a simple list of items (this logic can be more complex as needed)
+        // Create dummy items based on itemsNum from the request
         List<Item> items = new ArrayList<>();
-        Item item = new Item();
-        item.setItemId("ITEM-001");
-        item.setQuantity(1);
-        item.setPrice(19.99);
-        items.add(item);
+        for (int i = 1; i <= request.getItemsNum(); i++) {
+            Item item = new Item();
+            item.setItemId(String.format("ITEM-%03d", i));
+            item.setQuantity(1 + new Random().nextInt(5));
+            double price = Math.round((10 + (90 * new Random().nextDouble())) * 100.0) / 100.0;
+            item.setPrice(price);
+            items.add(item);
+        }
         order.setItems(items);
 
-        order.setTotalAmount(19.99);
+        double total = items.stream().mapToDouble(item -> item.getPrice() * item.getQuantity()).sum();
+        order.setTotalAmount(Math.round(total * 100.0) / 100.0);
         order.setCurrency("USD");
         order.setStatus("new");
 
-        // Save the newly created order in the repository
-        orderRepository.save(order);
+        // Save the order in our in-memory store
+        orderStore.put(order.getOrderId().toString(), order);
+
+        // Publish the order to Kafka using CompletableFuture-style callbacks.
+        // If your KafkaTemplate.send() returns a CompletableFuture, use thenAccept() and exceptionally().
+        kafkaTemplate.send("orders", order.getOrderId().toString(), order)
+                // If your version returns a ListenableFuture, you can convert it to a CompletableFuture:
+                //.completable()
+                .thenAccept((SendResult<String, Order> result) -> {
+                    System.out.printf("Order '%s' created successfully. Partition: %d, Offset: %d%n",
+                            order.getOrderId(),
+                            result.getRecordMetadata().partition(),
+                            result.getRecordMetadata().offset());
+                })
+                .exceptionally(ex -> {
+                    System.err.printf("Failed to send order '%s': %s%n", order.getOrderId(), ex.getMessage());
+                    ex.printStackTrace();
+                    return null;
+                });
+
         return order;
     }
 
-    // New method to update an existing order's status
-    public Order updateOrder(OrderUpdateRequest updateRequest) {
-        Order order = orderRepository.findByOrderId(updateRequest.getOrderId());
+    public Order updateOrder(OrderUpdateRequest request) {
+        Order order = orderStore.get(request.getOrderId());
         if (order != null) {
-            order.setStatus(updateRequest.getStatus());
-            // Save the updated order back to the repository
-            orderRepository.save(order);
+            order.setStatus(request.getStatus());
+            orderStore.put(order.getOrderId().toString(), order);
+
+            kafkaTemplate.send("orders", order.getOrderId().toString(), order)
+                    //.completable()  // Uncomment if needed.
+                    .thenAccept((SendResult<String, Order> result) -> {
+                        System.out.printf("Order '%s' updated successfully. Partition: %d, Offset: %d%n",
+                                order.getOrderId(),
+                                result.getRecordMetadata().partition(),
+                                result.getRecordMetadata().offset());
+                    })
+                    .exceptionally(ex -> {
+                        System.err.printf("Failed to update order '%s': %s%n", order.getOrderId(), ex.getMessage());
+                        ex.printStackTrace();
+                        return null;
+                    });
         }
         return order;
     }
 }
+
+
 

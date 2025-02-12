@@ -1,7 +1,7 @@
 package com.ecommerce.consumer.config;
 
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
-import com.ecommerce.consumer.model.Order;
+import com.example.avro.Order;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;

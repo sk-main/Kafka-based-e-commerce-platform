@@ -1,6 +1,6 @@
 package com.ecommerce.consumer.listener;
 
-import com.ecommerce.consumer.model.Order;
+import com.example.avro.Order;
 import com.ecommerce.consumer.repository.OrderRepository;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,7 @@ public class OrderListener {
     @KafkaListener(topics = "orders", groupId = "order-consumers")
     public void listen(Order order) {
         // Check for duplicate processing (if an order with the same orderId exists, skip processing).
-        if (orderRepository.findByOrderId(order.getOrderId()) != null) {
+        if (orderRepository.findByOrderId(order.getOrderId().toString()) != null) {
             System.out.printf("Order with ID: %s is already processed. Skipping processing.%n", order.getOrderId());
             return;
         }

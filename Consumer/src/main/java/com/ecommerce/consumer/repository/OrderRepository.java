@@ -1,6 +1,6 @@
 package com.ecommerce.consumer.repository;
 
-import com.ecommerce.consumer.model.Order;
+import com.example.avro.Order;
 import org.springframework.stereotype.Repository;
 
 import java.util.Map;
@@ -13,7 +13,7 @@ public class OrderRepository {
     private final Map<String, Order> orderStore = new ConcurrentHashMap<>();
 
     public void save(Order order) {
-        orderStore.put(order.getOrderId(), order);
+        orderStore.put(order.getOrderId().toString(), order);
     }
 
     public Order findByOrderId(String orderId) {
